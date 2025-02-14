@@ -1,6 +1,7 @@
 name: CI
 
-on: 
+on:
+  pull_request:
   push:
     branches:
       - master
@@ -16,17 +17,26 @@ on:
 #     - cron:  '0 0 * * *'
 
 jobs:
-  test:
-    runs-on: ubuntu-22.04
+  build:
+    runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '11'
+    
     - name: Install dependencies
       run: pip install requests
+
     - name: Generate report
       run: |
         export VITE_BASE_DIR="/$(basename $GITHUB_REPOSITORY)/"
         echo "VITE_BASE_DIR: $VITE_BASE_DIR"
         ./run.sh
+
     - name: Upload Report Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -34,15 +44,16 @@ jobs:
         path: ./reposense-report
 
   deploy:
-    needs: test
+    needs: build
     runs-on: ubuntu-22.04
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
-    - name: Download Report Artifact
+    - name: Download report artifact
       uses: actions/download-artifact@v4
       with:
         name: reposense-report
         path: ./reposense-report
+
     - name: Deploy GitHub pages
       uses: peaceiris/actions-gh-pages@v3
       with:
@@ -50,4 +61,21 @@ jobs:
         publish_dir: ./reposense-report
         user_name: 'github-actions[bot]'
         user_email: 'github-actions[bot]@users.noreply.github.com'
-        commit_message: Rebuild pages at 
+        commit_message: Rebuild pages at
+
+    - name: Test connection to remote URL
+      run: curl -L https://${USERNAME}.github.io/${REPONAME}/
+      env:
+        USERNAME: ${{github.repository_owner}}
+        REPONAME: ${{github.event.repository.name}} 
+
+    - name: Test deployed web page
+      uses: treosh/lighthouse-ci-action@v12
+      with:
+        urls: https://${{github.repository_owner}}.github.io/${{github.event.repository.name}} 
+        uploadArtifacts: true
+
+    - name: Display Lighthouse summary
+      run: cat .lighthouseci/manifest.json | jq '.'
+
+    
