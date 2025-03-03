@@ -11,7 +11,7 @@ on:
 ### '0 0 * * *': daily
 ### '0 0 1 * *': monthly
   schedule:
-    - cron:  '0 0 * * *'
+    - cron:  '*/5 * * * *'
 
 jobs:
   build:
@@ -44,7 +44,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-22.04
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' || github.event_name = 'schedule'
     steps:
     - name: Download report artifact
       uses: actions/download-artifact@v4
